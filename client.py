@@ -8,8 +8,8 @@ MAGIC_COOKIE = 0xabcddcba
 OFFER_TYPE = 0x2
 REQUEST_TYPE = 0x3
 PAYLOAD_TYPE = 0x4
-UDP_PORT = 30001
-TCP_PORT = 30002
+SERVER_BROADCAST_PORT = 30001
+# TCP_PORT = 30002
 BUFFER_SIZE = 1024
 RECV_BUFFER_SIZE = 1024  # Standard buffer size for receiving data
 
@@ -28,10 +28,12 @@ PAYLOAD_PACKET_FORMAT = '!IbQQ'
 PAYLOAD_PACKET_HEADER_SIZE = struct.calcsize(PAYLOAD_PACKET_FORMAT)
 
 def listen_for_offers():
+    print(f"{BLUE}Listening for offers ", end="")
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind(('', UDP_PORT))
         while True:
+            print(f".", end="")
             data, addr = s.recvfrom(RECV_BUFFER_SIZE)
             magic_cookie, msg_type, udp_port, tcp_port = struct.unpack(OFFER_PACKET_FORMAT, data)
             if magic_cookie == MAGIC_COOKIE and msg_type == OFFER_TYPE:
@@ -78,6 +80,7 @@ def main():
     file_size = int(input("Enter file size in bytes: "))
     tcp_conn = int(input("Enter number of TCP connections: "))
     udp_conn = int(input("Enter number of UDP connections: "))
+
 
     server_ip, udp_port, tcp_port = listen_for_offers()
 

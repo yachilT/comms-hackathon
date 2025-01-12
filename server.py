@@ -8,8 +8,8 @@ MAGIC_COOKIE = 0xabcddcba
 OFFER_TYPE = 0x2
 REQUEST_TYPE = 0x3
 PAYLOAD_TYPE = 0x4
-UDP_PORT = 20001
-TCP_PORT = 20002
+UDP_PORT = 30001
+TCP_PORT = 30002
 BUFFER_SIZE = 1024
 RECV_BUFFER_SIZE = 1024  # Standard buffer size for receiving data
 
@@ -27,13 +27,14 @@ REQUEST_PACKET_SIZE = struct.calcsize(REQUEST_PACKET_FORMAT)
 PAYLOAD_PACKET_FORMAT = '!IbQQ'
 PAYLOAD_PACKET_HEADER_SIZE = struct.calcsize(PAYLOAD_PACKET_FORMAT)
 
+CONTENT_DEBUG = True
 def send_offers():
     offer_message = struct.pack(OFFER_PACKET_FORMAT, MAGIC_COOKIE, OFFER_TYPE, UDP_PORT, TCP_PORT)
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         while True:
             s.sendto(offer_message, ('<broadcast>', UDP_PORT))
-            print(f"{GREEN}[Server] Offer sent.{RESET}")
+            print(f"{GREEN}[Server] Offer sent: {offer_message} {RESET}")
             time.sleep(1)
 
 def handle_tcp_client(conn, addr, file_size):
