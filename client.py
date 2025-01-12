@@ -9,12 +9,14 @@ OFFER_TYPE = 0x2
 REQUEST_TYPE = 0x3
 PAYLOAD_TYPE = 0x4
 SERVER_BROADCAST_PORT = 30001
-# TCP_PORT = 30002
 BUFFER_SIZE = 1024
 RECV_BUFFER_SIZE = 1024  # Standard buffer size for receiving data
 
 # ANSI Color Codes
 BLUE = '\033[94m'
+COLORS = ['\033[90m', '\033[91m', '\033[92m', '\033[93m', '\033[95m', '\033[96m', '\033[97m']
+UDP_DOWNLOAD_COLOR = COLORS[2]
+TCP_DOWNLOAD_COLOR = COLORS[5]
 RESET = '\033[0m'
 
 # Packet Format Constants
@@ -27,13 +29,15 @@ REQUEST_PACKET_SIZE = struct.calcsize(REQUEST_PACKET_FORMAT)
 PAYLOAD_PACKET_FORMAT = '!IbQQ'
 PAYLOAD_PACKET_HEADER_SIZE = struct.calcsize(PAYLOAD_PACKET_FORMAT)
 
+
+DEBUG_CONTENT = False
+
 def listen_for_offers():
-    print(f"{BLUE}Listening for offers ", end="")
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+    print(f"{BLUE}Listening for offers...")
+    with (socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s):
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.bind(('', UDP_PORT))
+        s.bind(('', SERVER_BROADCAST_PORT))
         while True:
-            print(f".", end="")
             data, addr = s.recvfrom(RECV_BUFFER_SIZE)
             magic_cookie, msg_type, udp_port, tcp_port = struct.unpack(OFFER_PACKET_FORMAT, data)
             if magic_cookie == MAGIC_COOKIE and msg_type == OFFER_TYPE:
@@ -50,12 +54,13 @@ def tcp_download(server_ip, tcp_port, file_size, connection_id):
             data = s.recv(BUFFER_SIZE)
             received += len(data)
         duration = time.time() - start_time
-        print(f"{BLUE}[Client] TCP download #{connection_id} complete in {duration:.2f} seconds{RESET}")
+        print(f"{TCP_DOWNLOAD_COLOR}[Client] TCP download #{connection_id} complete in {duration:.2f} seconds{RESET}")
 
 def udp_download(server_ip, udp_port, file_size, connection_id):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         request = struct.pack(REQUEST_PACKET_FORMAT, MAGIC_COOKIE, REQUEST_TYPE, file_size)
         s.sendto(request, (server_ip, udp_port))
+        print(f"{UDP_DOWNLOAD_COLOR}[Client] UDP download #{connection_id} requested{RESET}")
         start_time = time.time()
         received_segments = set()
         total_segments = 0
@@ -66,28 +71,47 @@ def udp_download(server_ip, udp_port, file_size, connection_id):
                 if len(data) >= PAYLOAD_PACKET_HEADER_SIZE:
                     _, msg_type, total_segments, segment_number = struct.unpack(PAYLOAD_PACKET_FORMAT, data[:PAYLOAD_PACKET_HEADER_SIZE])
                     if msg_type == PAYLOAD_TYPE:
+                        if DEBUG_CONTENT:
+                            print(f"{UDP_DOWNLOAD_COLOR}[Client] Received segment {segment_number}{RESET}")
                         received_segments.add(segment_number)
             except socket.timeout:
                 break
-        duration = time.time() - start_time
+        duration = time.time() - start_time - 1
         if total_segments > 0:
             success_rate = (len(received_segments) / total_segments) * 100
         else:
             success_rate = 0.0
-        print(f"{BLUE}[Client] UDP download #{connection_id} complete in {duration:.2f} seconds with {success_rate:.2f}% packet success rate{RESET}")
+        print(f"{UDP_DOWNLOAD_COLOR}[Client] UDP download #{connection_id} complete in {duration:.2f} seconds with {success_rate:.2f}% packet success rate{RESET}")
 
 def main():
-    file_size = int(input("Enter file size in bytes: "))
-    tcp_conn = int(input("Enter number of TCP connections: "))
-    udp_conn = int(input("Enter number of UDP connections: "))
+    while True:
+        file_size = int(input("Enter file size in bytes: "))
+        tcp_conn = int(input("Enter number of TCP connections: "))
+        udp_conn = int(input("Enter number of UDP connections: "))
 
+        server_ip, udp_port, tcp_port = listen_for_offers()
+        udp_threads = []
+        tcp_threads = []
+        for i in range(1, tcp_conn + 1):
+            tcp_threads.append(threading.Thread(target=tcp_download, args=(server_ip, tcp_port, file_size, i)))
 
-    server_ip, udp_port, tcp_port = listen_for_offers()
+        for i in range(1, udp_conn + 1):
+            udp_threads.append(threading.Thread(target=udp_download, args=(server_ip, udp_port, file_size, i)))
 
-    for i in range(1, tcp_conn + 1):
-        threading.Thread(target=tcp_download, args=(server_ip, tcp_port, file_size, i)).start()
-    for i in range(1, udp_conn + 1):
-        threading.Thread(target=udp_download, args=(server_ip, udp_port, file_size, i)).start()
+        for t in tcp_threads:
+            t.start()
+
+        for t in udp_threads:
+            t.start()
+
+        for t in tcp_threads:
+            t.join()
+
+        for t in udp_threads:
+            t.join()
+
+        print(f"{BLUE}[Client] All transfers complete, listening to offer requests{RESET}")
+
 
 if __name__ == "__main__":
     main()
