@@ -11,6 +11,7 @@ OFFER_TYPE = 0x2
 REQUEST_TYPE = 0x3
 PAYLOAD_TYPE = 0x4
 UDP_PORT = 30001
+OFFER_PORT = 30003
 TCP_PORT = 30002
 BUFFER_SIZE = 1024
 RECV_BUFFER_SIZE = 1024  # Standard buffer size for receiving data
@@ -35,8 +36,8 @@ def send_offers():
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         while True:
-            s.sendto(offer_message, (INADDR_BROAD, UDP_PORT))
-            print(f"{GREEN}[Server] Offer sent: {offer_message} {RESET}")
+            s.sendto(offer_message, (INADDR_BROAD, OFFER_PORT))
+            print(f"{GREEN}[Server] Offer sent:{RESET}")
             time.sleep(1)
 
 def handle_tcp_client(conn, addr, file_size):
@@ -84,9 +85,18 @@ def udp_listener():
                 threading.Thread(target=handle_udp_client, args=(addr, file_size)).start()
 
 def main():
-    threading.Thread(target=send_offers).start()
-    threading.Thread(target=tcp_listener).start()
-    threading.Thread(target=udp_listener).start()
+    offer = threading.Thread(target=send_offers)
+    tcp_listen = threading.Thread(target=tcp_listener)
+    udp_listen = threading.Thread(target=udp_listener)
+
+    offer.start()
+    tcp_listen.start()
+    udp_listen.start()
+
+    tcp_listen.join()
+    udp_listen.join()
+    offer.join()
+
 
 if __name__ == "__main__":
     main()

@@ -4,19 +4,28 @@ import struct
 import threading
 import time
 
+from server import TCP_PORT
+
 MAGIC_COOKIE = 0xabcddcba
 OFFER_TYPE = 0x2
 REQUEST_TYPE = 0x3
 PAYLOAD_TYPE = 0x4
-SERVER_BROADCAST_PORT = 30001
+BROADCAST_LISTEN_PORT = 30003
 BUFFER_SIZE = 1024
 RECV_BUFFER_SIZE = 1024  # Standard buffer size for receiving data
 
 # ANSI Color Codes
 BLUE = '\033[94m'
 COLORS = ['\033[90m', '\033[91m', '\033[92m', '\033[93m', '\033[95m', '\033[96m', '\033[97m']
-UDP_DOWNLOAD_COLOR = COLORS[2]
-TCP_DOWNLOAD_COLOR = COLORS[5]
+UDP_DOWNLOAD_COLOR = COLORS[3]
+TCP_DOWNLOAD_COLOR = COLORS[1]
+
+ADDR_COLOR = COLORS[6]
+METRIC_COLOR = COLORS[2]
+ID_COLOR = COLORS[5]
+OFFER_COLOR = COLORS[4]
+DATA_COLOR = BLUE
+
 RESET = '\033[0m'
 
 # Packet Format Constants
@@ -36,31 +45,32 @@ def listen_for_offers():
     print(f"{BLUE}Listening for offers...")
     with (socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s):
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.bind(('', SERVER_BROADCAST_PORT))
+        s.bind(('', BROADCAST_LISTEN_PORT))
         while True:
             data, addr = s.recvfrom(RECV_BUFFER_SIZE)
             magic_cookie, msg_type, udp_port, tcp_port = struct.unpack(OFFER_PACKET_FORMAT, data)
             if magic_cookie == MAGIC_COOKIE and msg_type == OFFER_TYPE:
-                print(f"{BLUE}[Client] Offer received from {addr[0]} UDP port: {udp_port} TCP port: {tcp_port}{RESET}")
+                print(f"[Client] {OFFER_COLOR}Offer{RESET} received from {ADDR_COLOR}{addr[0]}{RESET} {UDP_DOWNLOAD_COLOR}UDP{RESET} port: {UDP_DOWNLOAD_COLOR}{udp_port}{RESET} {TCP_PORT}TCP{RESET} port: {ADDR_COLOR}{tcp_port}{RESET}")
                 return addr[0], udp_port, tcp_port
 
 def tcp_download(server_ip, tcp_port, file_size, connection_id):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((server_ip, tcp_port))
         s.sendall(f"{file_size}\n".encode())
+        print(f"[Client] {TCP_DOWNLOAD_COLOR}TCP{TCP_DOWNLOAD_COLOR} download {ID_COLOR}#{connection_id}{RESET} requested{RESET}")
         start_time = time.time()
         received = 0
         while received < file_size:
             data = s.recv(BUFFER_SIZE)
             received += len(data)
         duration = time.time() - start_time
-        print(f"{TCP_DOWNLOAD_COLOR}[Client] TCP download #{connection_id} complete in {duration:.2f} seconds{RESET}")
+        print(f"[Client] {TCP_DOWNLOAD_COLOR}TCP{TCP_DOWNLOAD_COLOR} download {ID_COLOR}#{connection_id}{RESET} complete in {METRIC_COLOR}{duration:.2f} seconds{RESET}")
 
 def udp_download(server_ip, udp_port, file_size, connection_id):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         request = struct.pack(REQUEST_PACKET_FORMAT, MAGIC_COOKIE, REQUEST_TYPE, file_size)
         s.sendto(request, (server_ip, udp_port))
-        print(f"{UDP_DOWNLOAD_COLOR}[Client] UDP download #{connection_id} requested{RESET}")
+        print(f"[Client] {UDP_DOWNLOAD_COLOR}UDP{RESET} download {ID_COLOR}#{connection_id} requested{RESET}")
         start_time = time.time()
         received_segments = set()
         total_segments = 0
@@ -72,7 +82,7 @@ def udp_download(server_ip, udp_port, file_size, connection_id):
                     _, msg_type, total_segments, segment_number = struct.unpack(PAYLOAD_PACKET_FORMAT, data[:PAYLOAD_PACKET_HEADER_SIZE])
                     if msg_type == PAYLOAD_TYPE:
                         if DEBUG_CONTENT:
-                            print(f"{UDP_DOWNLOAD_COLOR}[Client] Received segment {segment_number}{RESET}")
+                            print(f"[Client] Received {UDP_DOWNLOAD_COLOR}UDP{RESET} segment{METRIC_COLOR}{segment_number}{RESET}")
                         received_segments.add(segment_number)
             except socket.timeout:
                 break
@@ -81,7 +91,7 @@ def udp_download(server_ip, udp_port, file_size, connection_id):
             success_rate = (len(received_segments) / total_segments) * 100
         else:
             success_rate = 0.0
-        print(f"{UDP_DOWNLOAD_COLOR}[Client] UDP download #{connection_id} complete in {duration:.2f} seconds with {success_rate:.2f}% packet success rate{RESET}")
+        print(f"[Client] {UDP_DOWNLOAD_COLOR}UDP{RESET} download {ID_COLOR}#{connection_id}{RESET} complete {DATA_COLOR}{data[PAYLOAD_PACKET_HEADER_SIZE:].decode()}{RESET}\nin {METRIC_COLOR}{duration:.2f}{RESET} seconds with {METRIC_COLOR}{success_rate:.2f}%{RESET} packet success rate{RESET}")
 
 def main():
     while True:
