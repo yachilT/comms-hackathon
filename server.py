@@ -3,9 +3,11 @@ import socket
 import threading
 import struct
 import time
+import netifaces
 # import tqdm
 # from tqdm import tqdm
 
+MAX_ERROR_COUNT = 5
 MAGIC_COOKIE = 0xabcddcba
 OFFER_TYPE = 0x2
 REQUEST_TYPE = 0x3
@@ -18,6 +20,7 @@ RECV_BUFFER_SIZE = 1024  # Standard buffer size for receiving data
 INADDR_BROAD = '192.168.215.255'
 # ANSI Color Codes
 GREEN = '\033[92m'
+ERROR = '\033[91m'
 RESET = '\033[0m'
 
 # Packet Format Constants
@@ -31,14 +34,39 @@ PAYLOAD_PACKET_FORMAT = '!IbQQ'
 PAYLOAD_PACKET_HEADER_SIZE = struct.calcsize(PAYLOAD_PACKET_FORMAT)
 
 CONTENT_DEBUG = False
+
+def get_broadcast_address():
+    interfaces = netifaces.interfaces()
+    for interface in interfaces:
+        try:
+            # Get network details for each interface
+            details = netifaces.ifaddresses(interface)
+            if netifaces.AF_INET in details:  # Check for IPv4 configuration
+                ipv4_info = details[netifaces.AF_INET][0]
+                ip = ipv4_info['addr']
+                subnet = ipv4_info['netmask']
+                broadcast = ipv4_info['broadcast']
+                return broadcast
+        except KeyError:
+            continue
+    return None
+
 def send_offers():
+    error_count = 0
+    broadcast_addr = get_broadcast_address()
     offer_message = struct.pack(OFFER_PACKET_FORMAT, MAGIC_COOKIE, OFFER_TYPE, UDP_PORT, TCP_PORT)
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as s:
+
         s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        while True:
-            s.sendto(offer_message, (INADDR_BROAD, OFFER_PORT))
-            print(f"{GREEN}[Server] Offer sent:{RESET}")
-            time.sleep(1)
+        while error_count < MAX_ERROR_COUNT:
+            try:
+                s.sendto(offer_message, (broadcast_addr, OFFER_PORT))
+                print(f"{GREEN}[Server] Offer sent:{RESET}")
+                time.sleep(1)
+            except Exception as e:
+                error_count += 1
+                print(f"[Server] {ERROR}Error{RESET} sending offer: {e}")
+        print(f"[Server] Offer sending stopped.")
 
 def handle_tcp_client(conn, addr, file_size):
     print(f"{GREEN}[Server] TCP connection from {addr}{RESET}")
