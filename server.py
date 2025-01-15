@@ -5,7 +5,7 @@ import struct
 import time
 import netifaces
 
-from client import OFFER_COLOR
+from client import OFFER_COLOR, ADDR_COLOR, COLORS, METRIC_COLOR
 
 # import tqdm
 # from tqdm import tqdm
@@ -27,7 +27,8 @@ ERROR = '\033[91m'
 RESET = '\033[0m'
 LISTEN_COLOR = '\033[95m'
 TCP_COLOR = '\033[91m'
-UDP_COLOR = '\033[92m'
+UDP_COLOR = '\033[93m'
+METRIC_COLOR = '\033[92m'
 
 # Packet Format Constants
 OFFER_PACKET_FORMAT = '!IbHH'
@@ -59,7 +60,7 @@ def get_broadcast_address():
 
 def send_offers():
     error_count = 0
-    broadcast_addr = INADDR_BROAD
+    broadcast_addr = get_broadcast_address()
     offer_message = struct.pack(OFFER_PACKET_FORMAT, MAGIC_COOKIE, OFFER_TYPE, UDP_PORT, TCP_PORT)
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as s:
 
@@ -67,7 +68,7 @@ def send_offers():
         while error_count < MAX_ERROR_COUNT:
             try:
                 s.sendto(offer_message, (broadcast_addr, OFFER_PORT))
-                print(f"{GREEN}[Server] Offer sent:{RESET}")
+                print(f"{GREEN}[Server]{RESET} {OFFER_COLOR}Offer sent:{RESET}")
                 time.sleep(1)
             except Exception as e:
                 error_count += 1
@@ -75,7 +76,7 @@ def send_offers():
         print(f"{GREEN}[Server]{RESET} {OFFER_COLOR}Offer sending{RESET} stopped.")
 
 def handle_tcp_client(conn, addr, file_size):
-    print(f"{GREEN}[Server] TCP connection from {addr}{RESET}")
+    print(f"{GREEN}[Server] {TCP_COLOR}TCP connection{RESET} from {ADDR_COLOR}{addr}{RESET}")
     data = b'x' * file_size
     conn.sendall(data)
     conn.close()
@@ -88,18 +89,18 @@ def handle_udp_client(addr, file_size):
         for segment in range(total_segments):
             payload = struct.pack(PAYLOAD_PACKET_FORMAT, MAGIC_COOKIE, PAYLOAD_TYPE, total_segments + (1 if last_segment_size > 0 else 0), segment) + b'x' * data_size
             if CONTENT_DEBUG:
-                print(f"{GREEN}[Server] sending udp packet with size {len(payload)} completed.{RESET}")
+                print(f"{GREEN}[Server]{RESET} sending {UDP_COLOR}udp packet{RESET} with size {METRIC_COLOR}{len(payload)}{RESET} completed.")
             udp_socket.sendto(payload, addr)
         if last_segment_size > 0:
             payload = struct.pack(PAYLOAD_PACKET_FORMAT, MAGIC_COOKIE, PAYLOAD_TYPE, total_segments + 1, total_segments) + b'x' * last_segment_size
             udp_socket.sendto(payload, addr)
-        print(f"{GREEN}[Server] UDP transfer to {addr} completed.{RESET}")
+        print(f"{GREEN}[Server]{RESET} {UDP_COLOR}UDP transfer{RESET} to {ADDR_COLOR}{addr}{RESET} completed.")
 
 def tcp_listener():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(('', TCP_PORT))
         s.listen()
-        print(f"{GREEN}[Server] TCP server {LISTEN_COLOR}listening on port {TCP_PORT}{RESET}")
+        print(f"{GREEN}[Server]{RESET} {TCP_COLOR}TCP server{RESET} {LISTEN_COLOR}listening{RESET} on {ADDR_COLOR}port {TCP_PORT}{RESET}")
         while True:
             conn, addr = s.accept()
             file_size = int(conn.recv(RECV_BUFFER_SIZE).decode().strip())
@@ -108,13 +109,13 @@ def tcp_listener():
 def udp_listener():
     with (socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s):
         s.bind(('', UDP_PORT))
-        print(f"{GREEN}[Server] UDP server listening on port {UDP_PORT}{RESET}")
+        print(f"{GREEN}[Server]{RESET} {UDP_COLOR}UDP server{RESET} {LISTEN_COLOR}listening{RESET} on {ADDR_COLOR}port {UDP_PORT}{RESET}")
         while True:
             data, addr = s.recvfrom(RECV_BUFFER_SIZE)
             if len(data) >= REQUEST_PACKET_SIZE and \
                 struct.unpack(REQUEST_PACKET_FORMAT, data[:REQUEST_PACKET_SIZE])[0:2] == (MAGIC_COOKIE, REQUEST_TYPE):
 
-                print(f"{GREEN}[Server] UDP request received from {addr}{RESET}")
+                print(f"{GREEN}[Server]{RESET} {UDP_COLOR}UDP request{RESET} received from {ADDR_COLOR}{addr}{RESET}")
                 file_size = struct.unpack(REQUEST_PACKET_FORMAT, data[:REQUEST_PACKET_SIZE])[2]
                 threading.Thread(target=handle_udp_client, args=(addr, file_size)).start()
 
