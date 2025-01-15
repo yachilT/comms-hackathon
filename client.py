@@ -66,6 +66,7 @@ def listen_for_offers():
        Raises:
            struct.error: If unpacking the received data fails due to incorrect format.
 
+
        Example:
            >>> ip, udp_port, tcp_port = listen_for_offers()
            [Client] Listening for offers...
