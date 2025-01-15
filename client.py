@@ -20,7 +20,7 @@ COLORS = ['\033[90m', '\033[91m', '\033[92m', '\033[93m', '\033[95m', '\033[96m'
 UDP_DOWNLOAD_COLOR = COLORS[3]
 TCP_DOWNLOAD_COLOR = COLORS[1]
 
-ADDR_COLOR = COLORS[6]
+ADDR_COLOR = '\033[035m'
 METRIC_COLOR = COLORS[2]
 ID_COLOR = COLORS[5]
 OFFER_COLOR = COLORS[4]
@@ -42,7 +42,7 @@ PAYLOAD_PACKET_HEADER_SIZE = struct.calcsize(PAYLOAD_PACKET_FORMAT)
 DEBUG_CONTENT = False
 
 def listen_for_offers():
-    print(f"{BLUE}Listening for offers...")
+    print(f"{OFFER_COLOR}Listening for offers...")
     with (socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s):
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind(('', BROADCAST_LISTEN_PORT))
@@ -50,7 +50,7 @@ def listen_for_offers():
             data, addr = s.recvfrom(RECV_BUFFER_SIZE)
             magic_cookie, msg_type, udp_port, tcp_port = struct.unpack(OFFER_PACKET_FORMAT, data)
             if magic_cookie == MAGIC_COOKIE and msg_type == OFFER_TYPE:
-                print(f"[Client] {OFFER_COLOR}Offer{RESET} received from {ADDR_COLOR}{addr[0]}{RESET} {UDP_DOWNLOAD_COLOR}UDP{RESET} port: {UDP_DOWNLOAD_COLOR}{udp_port}{RESET} {TCP_PORT}TCP{RESET} port: {ADDR_COLOR}{tcp_port}{RESET}")
+                print(f"[Client] {OFFER_COLOR}Offer received{RESET} from {ADDR_COLOR}{addr[0]}{RESET} {UDP_DOWNLOAD_COLOR}UDP{RESET} port: {UDP_DOWNLOAD_COLOR}{udp_port}{RESET} {TCP_PORT}TCP{RESET} port: {ADDR_COLOR}{tcp_port}{RESET}")
                 return addr[0], udp_port, tcp_port
 
 def tcp_download(server_ip, tcp_port, file_size, connection_id):
@@ -70,7 +70,7 @@ def udp_download(server_ip, udp_port, file_size, connection_id):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         request = struct.pack(REQUEST_PACKET_FORMAT, MAGIC_COOKIE, REQUEST_TYPE, file_size)
         s.sendto(request, (server_ip, udp_port))
-        print(f"[Client] {UDP_DOWNLOAD_COLOR}UDP{RESET} download {ID_COLOR}#{connection_id} requested{RESET}")
+        print(f"[Client] {UDP_DOWNLOAD_COLOR}UDP download {ID_COLOR}#{connection_id}{RESET} requested")
         start_time = time.time()
         received_segments = set()
         total_segments = 0

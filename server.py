@@ -17,7 +17,6 @@ OFFER_PORT = 30003
 TCP_PORT = 30002
 BUFFER_SIZE = 1024
 RECV_BUFFER_SIZE = 1024  # Standard buffer size for receiving data
-INADDR_BROAD = '192.168.215.255'
 # ANSI Color Codes
 GREEN = '\033[92m'
 ERROR = '\033[91m'
@@ -43,8 +42,6 @@ def get_broadcast_address():
             details = netifaces.ifaddresses(interface)
             if netifaces.AF_INET in details:  # Check for IPv4 configuration
                 ipv4_info = details[netifaces.AF_INET][0]
-                ip = ipv4_info['addr']
-                subnet = ipv4_info['netmask']
                 broadcast = ipv4_info['broadcast']
                 return broadcast
         except KeyError:
