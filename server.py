@@ -42,25 +42,36 @@ PAYLOAD_PACKET_HEADER_SIZE = struct.calcsize(PAYLOAD_PACKET_FORMAT)
 
 CONTENT_DEBUG = False
 
+import psutil
+
 def get_broadcast_address():
-    interfaces = netifaces.interfaces()
-    for interface in interfaces:
+    server_ip = ""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         try:
-            # Get network details for each interface
-            details = netifaces.ifaddresses(interface)
-            if netifaces.AF_INET in details:  # Check for IPv4 configuration
-                ipv4_info = details[netifaces.AF_INET][0]
-                ip = ipv4_info['addr']
-                subnet = ipv4_info['netmask']
-                broadcast = ipv4_info['broadcast']
-                return broadcast
-        except KeyError:
-            continue
-    return None
+            s.connect(("8.8.8.8", 80))  # Use an external address to determine the outbound interface
+            server_ip = s.getsockname()[0] # PC IP that was used in the connection
+        except:
+            server_ip = "127.0.0.1" # Local host address in case we couldn't connect or don't have an IP
+
+
+    if str(server_ip) == "127.0.0.1":  # In case server IP retrieval failed
+        return "127.255.255.255"
+    for interface in netifaces.interfaces():  # Go through the network interfaces of the device and check which one has our IP
+        addrs = netifaces.ifaddresses(interface)
+        if netifaces.AF_INET in addrs:  # Check if the interface has an IPv4 address assigned
+            ipv4_info = addrs[netifaces.AF_INET][0]
+            if str(ipv4_info['addr']) == str(
+                    server_ip):  # Check if the interface IP matches our own in case of multiple active interfaces
+                return str(ipv4_info['broadcast'])
+
+
 
 def send_offers():
     error_count = 0
     broadcast_addr = get_broadcast_address()
+    if broadcast_addr is None:
+        print(f"{GREEN}[Server]{RESET}{ERROR}Error{RESET} getting broadcast address.")
+        return
     offer_message = struct.pack(OFFER_PACKET_FORMAT, MAGIC_COOKIE, OFFER_TYPE, UDP_PORT, TCP_PORT)
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as s:
 
