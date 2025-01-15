@@ -3,7 +3,7 @@ import socket
 import threading
 import struct
 import time
-import netifaces
+import psutil
 
 from client import OFFER_COLOR
 
@@ -41,25 +41,26 @@ PAYLOAD_PACKET_HEADER_SIZE = struct.calcsize(PAYLOAD_PACKET_FORMAT)
 
 CONTENT_DEBUG = False
 
-def get_broadcast_address():
-    interfaces = netifaces.interfaces()
-    for interface in interfaces:
-        try:
-            # Get network details for each interface
-            details = netifaces.ifaddresses(interface)
-            if netifaces.AF_INET in details:  # Check for IPv4 configuration
-                ipv4_info = details[netifaces.AF_INET][0]
-                ip = ipv4_info['addr']
-                subnet = ipv4_info['netmask']
-                broadcast = ipv4_info['broadcast']
-                return broadcast
-        except KeyError:
-            continue
+
+def get_broadcast_address_dynamic():
+    """
+    Dynamically get the broadcast address for the active network interface.
+
+    Returns:
+        str: The broadcast address of the active network.
+    """
+    interfaces = psutil.net_if_addrs()
+    for iface, addresses in interfaces.items():
+        for addr in addresses:
+            if addr.family == socket.AF_INET:
+                return addr.broadcast
     return None
 
 def send_offers():
     error_count = 0
-    broadcast_addr = INADDR_BROAD
+    broadcast_addr = get_broadcast_address_dynamic()
+    if (broadcast_addr is None): # If no broadcast address is found, use the default broadcast address
+        return
     offer_message = struct.pack(OFFER_PACKET_FORMAT, MAGIC_COOKIE, OFFER_TYPE, UDP_PORT, TCP_PORT)
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as s:
 
