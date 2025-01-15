@@ -4,6 +4,9 @@ import threading
 import struct
 import time
 import netifaces
+
+from client import OFFER_COLOR
+
 # import tqdm
 # from tqdm import tqdm
 
@@ -17,10 +20,14 @@ OFFER_PORT = 30003
 TCP_PORT = 30002
 BUFFER_SIZE = 1024
 RECV_BUFFER_SIZE = 1024  # Standard buffer size for receiving data
+INADDR_BROAD = '192.168.215.255'
 # ANSI Color Codes
 GREEN = '\033[92m'
 ERROR = '\033[91m'
 RESET = '\033[0m'
+LISTEN_COLOR = '\033[95m'
+TCP_COLOR = '\033[91m'
+UDP_COLOR = '\033[92m'
 
 # Packet Format Constants
 OFFER_PACKET_FORMAT = '!IbHH'
@@ -42,6 +49,8 @@ def get_broadcast_address():
             details = netifaces.ifaddresses(interface)
             if netifaces.AF_INET in details:  # Check for IPv4 configuration
                 ipv4_info = details[netifaces.AF_INET][0]
+                ip = ipv4_info['addr']
+                subnet = ipv4_info['netmask']
                 broadcast = ipv4_info['broadcast']
                 return broadcast
         except KeyError:
@@ -50,7 +59,7 @@ def get_broadcast_address():
 
 def send_offers():
     error_count = 0
-    broadcast_addr = get_broadcast_address()
+    broadcast_addr = INADDR_BROAD
     offer_message = struct.pack(OFFER_PACKET_FORMAT, MAGIC_COOKIE, OFFER_TYPE, UDP_PORT, TCP_PORT)
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as s:
 
@@ -62,8 +71,8 @@ def send_offers():
                 time.sleep(1)
             except Exception as e:
                 error_count += 1
-                print(f"[Server] {ERROR}Error{RESET} sending offer: {e}")
-        print(f"[Server] Offer sending stopped.")
+                print(f"{GREEN}[Server]{RESET}{ERROR}Error{RESET} sending offer: {e}")
+        print(f"{GREEN}[Server]{RESET} {OFFER_COLOR}Offer sending{RESET} stopped.")
 
 def handle_tcp_client(conn, addr, file_size):
     print(f"{GREEN}[Server] TCP connection from {addr}{RESET}")
@@ -90,7 +99,7 @@ def tcp_listener():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(('', TCP_PORT))
         s.listen()
-        print(f"{GREEN}[Server] TCP server listening on port {TCP_PORT}{RESET}")
+        print(f"{GREEN}[Server] TCP server {LISTEN_COLOR}listening on port {TCP_PORT}{RESET}")
         while True:
             conn, addr = s.accept()
             file_size = int(conn.recv(RECV_BUFFER_SIZE).decode().strip())
